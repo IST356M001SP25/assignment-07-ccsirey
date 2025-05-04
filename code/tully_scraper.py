@@ -10,43 +10,21 @@ def tullyscraper(playwright: Playwright) -> None:
     page = context.new_page()
     page.goto("https://www.tullysgoodtimes.com/menus/")
 
-    all_menu_items = []
+    extracted_items = []
+    for title in page.query_selector_all("h3.foodmenu__menu-section-title"):
+        title_text = title.inner_text()
+        print("MENU SECTION:", title_text) 
+        row = title.query_selector("~ *").query_selector("~ *")
+        for item in row.query_selector_all("div.foodmenu__menu-item"):
+            item_text = item.inner_text()
+            extracted_item = extract_menu_item(title_text, item_text)
+            print(f"  MENU ITEM: {extracted_item.name}")
+            extracted_items.append(extracted_item.to_dict())
 
-    # Menu section titles
-    titles = page.locator(".menu-section-title")
-    title_count = titles.count()
-
-    for i in range(title_count):
-        title_element = titles.nth(i)
-        title_text = title_element.inner_text().strip()
-
-        # The actual menu items are a couple divs down — fix selector here
-        # Look for the first `.row` div *after* the title
-        section_div = title_element.locator("xpath=ancestor::div[contains(@class, 'menu-section')]/following-sibling::div[contains(@class, 'row')]").first
-
-        if not section_div:
-            print(f"Could not find section div for title: {title_text}")
-            continue
-
-        # Individual item blocks
-        item_elements = section_div.locator(".col-md-12")
-
-        for j in range(item_elements.count()):
-            item_block = item_elements.nth(j)
-            item_text = item_block.inner_text().strip()
-
-            if item_text:
-                try:
-                    menu_item = extract_menu_item(title_text, item_text)
-                    all_menu_items.append(menu_item.to_dict())
-                except Exception as e:
-                    print(f"Error extracting item under '{title_text}': {e}\nText:\n{item_text}\n")
-
-    # Write to CSV
-    if all_menu_items:
-        df = pd.DataFrame(all_menu_items)
-        df.to_csv("cache/tullys_menu.csv", index=False)
-
+    df = pd.DataFrame(extracted_items)
+    df.to_csv("cache/tullys_menu.csv", index=False)    
+    
+    # ---------------------
     context.close()
     browser.close()
 
